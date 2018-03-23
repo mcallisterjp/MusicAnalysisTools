@@ -3,23 +3,29 @@ import os
 import csv
 
 def oneKrnToXml(fileSourcePath, fileName):
+<<<<<<< HEAD
     '''
     Processes one pair of corresponding KRN and XML files,
     producing a new XML score with the original metadata (from the KRN score)
     and any necessary character swaps in both the metadata and lyrics.
     '''
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
     interimScore = transferMetadata(fileSourcePath, fileName)
     newScore = lyricSwap(interimScore)
     return newScore
 
 def corpusKrnToXml(fileSourcePath, fileDestinationPath,
                     searchTerm=None, fileFormat='.krn'): # Either, to avoid both
+<<<<<<< HEAD
     '''
     Batch processes a corpus of corresponding KRN and XML files;
     assumes same same folder, the same file name, different extensions (KRN vs XML).
     '''
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
     preparedFileList = prepFileList(fileSourcePath, searchTerm, fileFormat)
     for eachFile in preparedFileList: #[n]:
         try:
@@ -39,6 +45,7 @@ def corpusKrnToXml(fileSourcePath, fileDestinationPath,
 
 def characterSwaps(anyTextString):
     '''
+<<<<<<< HEAD
     Swaps out humdrum ASCII text representations like 'a/'
     for the corresponding character with accents ('á').
     Removes the characers used forphrase analysis etc ({, }, |)
@@ -50,6 +57,17 @@ def characterSwaps(anyTextString):
     characterDict = {'a/':'á', 'e/':'é', 'i/':'í', 'o/':'ó', 'u/':'ú',
                           'A/':'Á', 'E/':'É', 'I/':'Í', 'O/':'Ó', 'U/':'Ú',
                           'a\\':'à', 'e\\':'è', 'i\\':'ì', 'o\\':'ò', 'u\\':'ù', #Sic (backslash escaping python)
+=======
+    Swaps out humdrum text representations like 'a/'
+    for the corresponding character with accents ('á').
+    '''
+
+    charactersToCut = ['{', '}', '|', '"']
+    characterPairsDict = {'a/':'á', 'e/':'é', 'i/':'í', 'o/':'ó', 'u/':'ú',
+                          'A/':'Á', 'E/':'É', 'I/':'Í', 'O/':'Ó', 'U/':'Ú',
+                          'a\\':'à', 'e\\':'è', 'i\\':'ì', 'o\\':'ò', 'u\\':'ù',
+                          #Sic (backslash escaping python)
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
                           'A\\':'À', 'E\\':'È', 'I\\':'Ì', 'O\\':'Ò', 'U\\':'Ù',
                           'a^':'â', 'e^':'ê', 'i^':'î', 'o^':'ô', 'u^':'û',
                           'A^':'A', 'E^':'Ê', 'I^':'Î', 'O^':'Ô', 'U^':'U',
@@ -57,6 +75,7 @@ def characterSwaps(anyTextString):
                           'a1':'ā', 'e1':'ē', 'i1':'ī', 'o1':'ō', 'u1':'ū',
                           'a2':'ä', 'e2':'ē', 'i2':'ï', 'o2':'ö', 'u2':'ü',
                           'c5':'ç','C5':'Ç',
+<<<<<<< HEAD
                           'c6':'č','C6':'Č',
                      '{': '', '}': '', '|': '', '"': '', #Single characters to cut
                      '~': '–',} # Cheat solution for literal dash in written French e.g. ‘veux-tu'
@@ -70,12 +89,36 @@ def characterSwaps(anyTextString):
         if output[0] == '–':
             output = output[1:] #Cut first character of dashed-to word
     return(output)
+=======
+                          'c6':'č','C6':'Č',}
+# https://musiccog.ohio-state.edu/Humdrum/representations/text.rep.html
+
+    workingList = list(anyTextString)
+
+    #Pair substitutions (first due to length change)
+    for i in range(len(workingList) - 1)[::-1]:
+        testPair = (workingList[i-1], workingList[i])
+        testPairStr = ''.join(testPair)
+        if testPairStr in characterPairsDict.keys():
+            del workingList[i] # Delete the second character
+            workingList[i-1] = characterPairsDict.get(testPairStr) # Swap in new single character
+
+    #Single character cuts
+    workingList = [x for x in workingList if x not in charactersToCut]
+
+    finalStr = ''.join(workingList)
+
+    return(finalStr)
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
 
 def lyricSwap(score):
     '''
     Applied characterSwaps function to the lyrics (specifically) of an input score
     '''
+<<<<<<< HEAD
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
     fullNotesAndRests = score.recurse().notesAndRests
     for note in fullNotesAndRests:
         if note.lyric:
@@ -89,7 +132,10 @@ def prepFileList(fileSourcePath, searchTerm=None, fileFormat=None):
     Prepares a file list from a directory path and
     (optionally) filters for searchTerm and / or fileFormat such as '.xml')
     '''
+<<<<<<< HEAD
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
     initialList = []
     finalList = []
     for file in os.listdir(fileSourcePath):
@@ -111,10 +157,13 @@ def prepFileList(fileSourcePath, searchTerm=None, fileFormat=None):
 #-------------------------------------------------------------------------------
 
 def commasOut(text):
+<<<<<<< HEAD
     '''
     For 'Surname, FirstName' to 'FirstName Surname' conversions
     '''
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
     if ',' in text:
         position = text.index(',')
         twoNames = (text[position+2:],' ', text[:position])
@@ -124,10 +173,13 @@ def commasOut(text):
     return newName
 
 def commasIn(text):
+<<<<<<< HEAD
     '''
     For 'FirstName Surname' to 'Surname, FirstName' conversions
     '''
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
     if ',' not in text:
         position = text.index(' ')#To do: ossia for 'van'?
         twoNames = (text[position+1:],', ', text[:position])
@@ -145,7 +197,10 @@ def transferMetadata(fileSourcePath, fileName):
     including character swaps.
     Use either the '.krn' or the '.xml' for the fileName.
     '''
+<<<<<<< HEAD
 
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
 #     try:
     krnScore = converter.parse(fileSourcePath+fileName[0:-4]+'.krn')
     xmlScore = converter.parse(fileSourcePath+fileName[0:-4]+'.xml')
@@ -214,5 +269,8 @@ def transferMetadata(fileSourcePath, fileName):
 #                 xmlScore.metadata.item = 'No_'+item+'_Info'
 
     return xmlScore
+<<<<<<< HEAD
 
 #------------------------------------------------------------------------------
+=======
+>>>>>>> 7815c30d982f3cb75cc72449a52b5cca22275414
