@@ -22,12 +22,13 @@ def getSetsOfType(directoryOrFile='/Users/',
     Can be applied to a single file (e.g one composer on YCAC)
     or to several (e.g. all of YCAC)
     '''
+    
     chordList = []
     if multipleFiles:
-        fileList = getFiles(directoryOrFile)
-        for name in fileList:
-            print(file)
-            f = open(directoryOrFile+name)
+        directory = directoryOrFile
+        fileList = getFiles(directory)
+        for fileName in fileList:
+            f = open(directory+fileName)
             next(f) # Ignore header line
             for row in csv.reader(f):
                 if row[2] == chordType: # Normal form type
@@ -82,7 +83,8 @@ def compareAllNormals(primeList,
         #To do: generalise wider than triads?
         #'Diminished Seventh', '[0, 3, 6, 9]'
     if hitList == []:
-        print ("Please chose one or more triad types: 'major', 'minor', 'diminished', 'augmented', 'triads' (all of the above)")
+        print ("Please chose one or more triad types:
+        'major', 'minor', 'diminished', 'augmented', 'triads' (all of the above)")
 
     if Counts:
         currentTuple = ('Overall', total)
@@ -141,3 +143,55 @@ def offsetPositions(file):
                   'Weighted Proportion': sum(augs)/sum(totals),}
 
     return returnInfo
+
+def whatFollows(filePath,
+                targetChord = '[0, 4, 8]',
+                histogram=True,
+                howMany=15,
+                ignoreFirst=True):
+    '''
+    Get data for the chords which follow an input target chord of interest.
+    Optionally, return a histogram for the most common.
+    '''
+
+    f = open(filePath)
+    next(f)
+
+    pcs = []
+    for row in csv.reader(f):
+        pcs.append(row[3])
+
+    #Get position info for targetChord
+    positions = []
+    for i in [i for i,x in enumerate(pcs) if x == targetChord]:
+        positions.append(i)
+
+
+    #Retrieve following chord
+    following = []
+    for p in positions:
+        following.append(pcs[p+1])
+
+    if ignoreFirst==True:
+        value=1
+    else:
+        value=0
+    count = Counter(following).most_common()[value:15:1]
+
+    if histogram==False:
+        return count
+    else:
+        labels, values = zip(*count)
+        indexes = np.arange(len(labels))
+        width = 0.5
+        ##Plot
+        plt.bar(indexes, values, width)
+        plt.title("Chord usage",fontsize=16)
+        plt.xlabel("Chord type", fontsize=12)
+        plt.ylabel("Count", fontsize=12)
+        plt.xticks(indexes + width*0.5, labels, rotation=90)
+        plt.xticks(indexes, labels, rotation=90)
+        plt.gcf().subplots_adjust(bottom=0.25)
+        plt.savefig('Next.png', facecolor='w', edgecolor='w', format='png')
+        return count
+        return plt

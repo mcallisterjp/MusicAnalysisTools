@@ -10,6 +10,7 @@ def getOffsets(score):
     Retrieves position of note beginnings across a score.
     Expressed in terms of 'offset' from the start.
     ''' #To do: include expression in terms of bars / meter
+
     allNotes = score.stripTies().flat.notes
     allOffsets = [int(x.offset) for x in allNotes] #Int needed now or later
     return allOffsets
@@ -18,6 +19,7 @@ def allTimePointOffsetCounts(allOffsets):
     '''
     List of offset counts for every timepoint (integrating timepoints with no offsets)
     '''
+
     counts = Counter(allOffsets)
     firstOffset = int(min(allOffsets))
     lastOffset = int(max(allOffsets))
@@ -37,6 +39,7 @@ def allTimePointsWeighted(allTimePointOffsetCounts):
     '''
     Weights each offset count / timepoint by proximity to maximum/minimum no. of voices (0-n).
     '''
+
     allTimePointsWeighted = []
     maxInSection = max(allTimePointOffsetCounts)
     for x in allTimePointOffsetCounts:
@@ -81,6 +84,7 @@ def doCorpus(LocalCorpusName, noOfWorks=5): #LocalCorpus
     '''
     Runs the functions up to and including windowed average for all works in a corpus.
     '''
+
     for score in corpus.corpora.LocalCorpus(str(LocalCorpusName)).all()[:noOfWorks]: #don't forget 'all' for local corpus
     print (score.metadata.parentTitle)
     eachOneOfThem = doOneScore(score)
@@ -111,6 +115,7 @@ def getRankedLocalMax(info, #Input data
     ((x coordinate timepoint, y coordinate value),
         Number of timepoints for which this is a local max)
     '''
+
     shortList = []
     for lineIndex in range(len(info)-windowSize):
         currentValues = []
@@ -134,6 +139,7 @@ def getRankedLocalMin(info, #Input data
     ((x coordinate timepoint, y coordinate value),
         Number of timepoints for which this is a local min)
     '''
+    
     shortList = []
     for lineIndex in range(len(info)-windowSize):
         currentValues = []

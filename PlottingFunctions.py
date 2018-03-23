@@ -1,6 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+#Linear
+def linearFunc(x, a, b):
+    return a*x+b
+
+#Exponential
+def expoFunc(x, a, b, c):
+    return a*np.exp(-b*x)+c
+
+#Polynomials:
+def polyFunc(x, a, b, c, d):
+    return a*x**3 + b*x**2 + c*x + d
+
+#ArcTan
+def arcTanFunc(x, a, b, c, d):
+    return a*np.arctan(b*x + c) + d
+
 def histogramOfIntervals(intervalList, xLabel=None, yLabel=None, title=None):
     '''
     Plotting shortcut for case of interval list.
