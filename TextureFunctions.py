@@ -1,9 +1,19 @@
-from collections import Counter
+import unittest
+
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from music21 import * # To do: Check usage and reduce
+from collections import Counter
+from fractions import Fraction
+
+from music21 import common
+from music21 import exceptions21
+from music21 import pitch
+from music21 import interval
+from music21 import stream
+
+#------------------------------------------------------------------------------
 
 def getOffsets(score):
     '''
@@ -12,28 +22,39 @@ def getOffsets(score):
     ''' #To do: include expression in terms of bars / meter
 
     allNotes = score.stripTies().flat.notes
-    allOffsets = [int(x.offset) for x in allNotes] #Int needed now or later
+    allOffsets = [x.offset for x in allNotes]
     return allOffsets
 
-def allTimePointOffsetCounts(allOffsets):
+def allTimePointOffsetCounts(allOffsets, minValue=8):
     '''
-    List of offset counts for every timepoint (integrating timepoints with no offsets)
+    Lists number of offsets for every timepoint (integrating timepoints with no offsets)
     '''
 
-    counts = Counter(allOffsets)
-    firstOffset = int(min(allOffsets))
-    lastOffset = int(max(allOffsets))
-    numberOfOffsets = len(allOffsets)
+    filteredOffsets = [x for x in allOffsets if (Fraction(x).denominator*minValue == int)]
+    # Fraction(x).denominator < minValue/4]
+    # Deals with binary divisions, but not triplets.
+    # TO DO triplets, possibly with lcmValue = BasicSupportingFunctions.lcm(x, y)
+
+    denoms = [Fraction(x).denominator for x in allOffsets]
+    maxDenom = max(denoms)
+
+    allOffsetsNoFractions = [x*maxDenom for x in allOffsets]
+
+    counts = Counter(allOffsetsNoFractions) # keys = 'positions'; values = counts
+    firstOffset = int(min(allOffsetsNoFractions))
+    lastOffset = int(max(allOffsetsNoFractions))
+    # numberOfOffsets = len(allOffsets)
     spanRange = lastOffset - firstOffset
 
     allTimePointOffsetCounts = []
     for x in range(spanRange):
-        if x in counts.keys():
-            allTimePointOffsetCounts.append(counts[x]) #ie the values
+        if x in counts.keys(): # keys = positions;
+            allTimePointOffsetCounts.append(counts[x]) # values = counts
         else:
-            allTimePointOffsetCounts.append(0) #No offsets
+            allTimePointOffsetCounts.append(0) #No offsets at this position
 
     return allTimePointOffsetCounts
+    # To do: consider returning a new dict at this point; working with values thereafter
 
 def allTimePointsWeighted(allTimePointOffsetCounts):
     '''
@@ -55,6 +76,7 @@ def getWindowedAverage(listOfWeightedTimePoints, windowSize=16):
     '''
     Takes an average for a certain number (input) of weighted timepoints.
     '''
+
     numberOfTimepoints = len(listOfWeightedTimePoints)
     averagePerWindow = []
     for i in range(numberOfTimepoints - windowSize):
@@ -86,23 +108,23 @@ def doCorpus(LocalCorpusName, noOfWorks=5): #LocalCorpus
     '''
 
     for score in corpus.corpora.LocalCorpus(str(LocalCorpusName)).all()[:noOfWorks]: #don't forget 'all' for local corpus
-    print (score.metadata.parentTitle)
-    eachOneOfThem = doOneScore(score)
+        #print (score.metadata.parentTitle)
+        eachOneOfThem = doOneScore(score)
 
-    info = []
-    comp = score.metadata.composer
-    parent = score.metadata.parentTitle
-    title = score.metadata.title
-    uniqueName = [comp[0:4], '-', #Start of composer name
-                  parent[5:10], '-', #Start of title, ommitting 'Missa'
-                  title] #Whole title for case of Agnus I vs II
-    fileName = str(''.join(uniqueName))
-    print(fileName)
-    country=countryDict[comp]
+        info = []
+        comp = score.metadata.composer
+        parent = score.metadata.parentTitle
+        title = score.metadata.title
+        uniqueName = [comp[0:4], '-', #Start of composer name
+                      parent[5:10], '-', #Start of title, ommitting 'Missa'
+                      title] #Whole title for case of Agnus I vs II
+        fileName = str(''.join(uniqueName))
+        print(fileName)
+        country=countryDict[comp]
 
-    testList = [x for x in range(10)]
-    info = [comp, parent, title, country, eachOneOfThem]
-    storePickle(info, fileName)
+        testList = [x for x in range(10)]
+        info = [comp, parent, title, country, eachOneOfThem]
+        storePickle(info, fileName)
 
 #         storePickle(eachOneOfThem, score.metadata.parentTitle)
 
@@ -139,7 +161,7 @@ def getRankedLocalMin(info, #Input data
     ((x coordinate timepoint, y coordinate value),
         Number of timepoints for which this is a local min)
     '''
-    
+
     shortList = []
     for lineIndex in range(len(info)-windowSize):
         currentValues = []
@@ -191,3 +213,75 @@ def histogramOfAverages(dataList, xLabel=None, yLabel=None, title=None):
 #     plt.xticks(np.arange(min(dataList), max(dataList) + stepSize, stepSize),)
 
     return plt
+
+#------------------------------------------------------------------------------
+
+class Test(unittest.TestCase):
+
+    def testGetOffsets(score):
+
+        testscore = corpus.parse('bach/bwv1.6')
+        testOffsets = getOffsets(testscore)
+
+        self.assertIsInstance(testOffsets, list)
+        self.assertIsInstance(testOffsets[0], int)
+
+    def testTimePointOffsetCounts(self):
+
+        testscore = corpus.parse('bach/bwv1.6')
+        testOffsets = getOffsets(testscore)
+        testAllOffsets = allTimePointOffsetCounts(testOffsets)
+
+        self.assertIsInstance(testAllOffsets, list)
+        self.assertIsInstance(testAllOffsets[0], int)
+
+    def testAllTimePointsWeighted(self):
+
+        testscore = corpus.parse('bach/bwv1.6')
+        testOffsets = getOffsets(testscore)
+        testAllOffsets = allTimePointOffsetCounts(testOffsets)
+        testAllOffsetsWeighted = allTimePointsWeighted(testAllOffsets)
+
+        self.assertIsInstance(testAllOffsetsWeighted, list)
+        self.assertIsInstance(testAllOffsets[0], float)
+
+    def testWindowedAverage(self):
+
+        testscore = corpus.parse('bach/bwv1.6')
+        testOffsets = getOffsets(testscore)
+        testAllOffsets = allTimePointOffsetCounts(testOffsets)
+        testAllOffsetsWeighted = allTimePointsWeighted(testAllOffsets)
+        avs = getWindowedAverage(testAllOffsetsWeighted)
+
+        self.assertIsInstance(avs, list)
+        self.assertIsInstance(avs[0], float)
+
+    # def testDoOneScore(self):
+
+    def testGetRankedLocalMax(self):
+
+        testInfo = [0.04, 0.04, 0.04, 0.05, 0.05, 0.05, 0.06, 0.08, 0.09, 0.09, 0.09, 0.1, 0.1,
+        0.1, 0.1, 0.09, 0.09, 0.09, 0.09, 0.08, 0.08, 0.08, 0.06, 0.05, 0.05, 0.05, 0.05, 0.05,
+        0.06, 0.06, 0.06, 0.07, 0.07, 0.07, 0.07, 0.1, 0.1, 0.1, 0.1,]
+
+        testResult = TextureFunctions.getRankedLocalMax(testInfo, n=2, threshold=0.09, windowSize=4)
+
+        self.assertEqual(len(testResult), n)
+        self.assertIsInstance(testResult[0][0][0], int) # Position
+        self.assertIsInstance(testResult[0][0][1], float) # Value (average)
+        self.assertIsInstance(testResult[0][1], int) # Count
+
+    def testGetRankedLocalMin(self):
+
+        testInfo = [0.04, 0.04, 0.04, 0.05, 0.05, 0.05, 0.06, 0.08, 0.09, 0.09, 0.09, 0.1, 0.1,
+        0.1, 0.1, 0.09, 0.09, 0.09, 0.09, 0.08, 0.08, 0.08, 0.06, 0.05, 0.05, 0.05, 0.05, 0.05,
+        0.06, 0.06, 0.06, 0.07, 0.07, 0.07, 0.07, 0.1, 0.1, 0.1, 0.1,]
+
+        testResult = TextureFunctions.getRankedLocalMin(testInfo, n=2, threshold=0.09, windowSize=4)
+
+        self.assertEqual(len(testResult), n)
+        self.assertIsInstance(testResult[0][0][0], int) # Position
+        self.assertIsInstance(testResult[0][0][1], float) # Value (average)
+        self.assertIsInstance(testResult[0][1], int) # Count
+
+#-------------------------------------------------------------------------------
