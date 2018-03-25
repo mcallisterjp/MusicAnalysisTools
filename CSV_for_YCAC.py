@@ -1,10 +1,70 @@
+from music21 import common
+from music21 import exceptions21
+from music21 import pitch
+from music21 import interval
+from music21 import stream
+from music21 import converter
+
 from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
 import os
 
+#------------------------------------------------------------------------------
+
+# Make YCAC-like CSV files
+
+def makeYCAC(scoreFilePath='/Users/',
+            scoreFileName='ClaraSchumann.xml',
+            csvFilePath='/Users/',
+            csvFileName='ClaraSchumann.csv',):
+            # objectsOfInterest
+    '''
+    Makes a YCAC-like CSV file for one work from an input score.
+    Modelled on White and Quinn 2014, see https://ycac.yale.edu/.
+    NB: not the actual code used to generate YCAC; author unaffiliated with the YCAC project.
+    '''
+
+    objectsOfInterest=['offset', 'chord', 'primeForm', 'normalOrder', 'beatStrength']
+    # To do: more objectsOfInterest and as settable variable (select among options)
+
+    with open(csvFilePath+csvFileName, 'w') as csvfile:
+        csvOut = csv.writer(csvfile, delimiter=',',
+                            quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                            # quotechar " allows commas (e.g. in prime forms) within the CSV file
+
+        csvOut.writerow([x for x in objectsOfInterest])
+        # To do: Corpus option with one header row for all
+
+        score = converter.parse(scoreFilePath+scoreFileName)
+        chordScore = score.flat.stripTies().chordify()
+        for x in chordScore:
+            offset = x.offset
+            chord = x
+            primeForm = x.primeForm
+            normalOrder = x.normalOrder
+            beatStrength = x.beatStrength # Not in YCAC (based on MIDI files)
+
+            ## More options
+            # pitches = [p.nameWithOctave for p in x.pitches]
+            # file = score.metadata.title
+            # composer = score.metadata.compose
+
+            csvOut.writerow([offset, chord, primeForm, normalOrder, beatStrength])
+
+#------------------------------------------------------------------------------
+
+# Use YCAC CSV files
+
 def getFiles(filePath='/Users/'):
+    '''
+    Retrieves files in the listed directory. So:
+    >>> fileList = getFiles(directory)
+    >>> for fileName in fileList:
+    >>>     [Any of the below functions]
+    '''
+
     fileList = []
     for file in os.listdir(filePath):
         if file.endswith(".csv"):
@@ -12,9 +72,8 @@ def getFiles(filePath='/Users/'):
     return fileList
 
 # Specific Triad Types:
-def getSetsOfType(directoryOrFile='/Users/',
-                  chordType='[0, 4, 8]',
-                  multipleFiles=True,):
+def getSetsOfType(file='ClaraSchumann.csv',
+                  chordType='[0, 4, 8]',):
     '''
     Get all cases of a specific chord type (expressed as PC Set).
     Returns a dict with each transposition of the chord,
@@ -22,33 +81,25 @@ def getSetsOfType(directoryOrFile='/Users/',
     Can be applied to a single file (e.g one composer on YCAC)
     or to several (e.g. all of YCAC)
     '''
-    
+
     chordList = []
-    if multipleFiles:
-        directory = directoryOrFile
-        fileList = getFiles(directory)
-        for fileName in fileList:
-            f = open(directory+fileName)
-            next(f) # Ignore header line
-            for row in csv.reader(f):
-                if row[2] == chordType: # Normal form type
-                    chordList.append(row[3]) #Specific transposition
-    else:
-        f = open(directoryOrFile)
-        next(f)
-        for row in csv.reader(f):
-            if row[2] == chordType:
-                chordList.append(row[3])
+
+    f = open(file)
+    next(f)
+    for row in csv.reader(f):
+        if row[2] == chordType:
+            chordList.append(row[3])
 
     chordArray = np.array(Counter(chordList)) # TODO: Maybe add most common filter?
     return chordArray
 
-def getAllNormals(filePath):
+def getAllNormals(file):
     '''
     Retrieves all normal orders in a file and compares relative usage
     '''
+
     primeList = []
-    f = open(filePath)
+    f = open(file)
     next(f) # to skip header line. Ossia: f.readline(), but not f.next() which is for python 2
 
     for row in csv.reader(f):
@@ -83,8 +134,8 @@ def compareAllNormals(primeList,
         #To do: generalise wider than triads?
         #'Diminished Seventh', '[0, 3, 6, 9]'
     if hitList == []:
-        print ("Please chose one or more triad types:
-        'major', 'minor', 'diminished', 'augmented', 'triads' (all of the above)")
+        print ("Please chose one or more triad types")
+        #: 'major', 'minor', 'diminished', 'augmented', 'triads' (all of the above)")
 
     if Counts:
         currentTuple = ('Overall', total)
@@ -104,7 +155,7 @@ def compareAllNormals(primeList,
 def offsetPositions(file):
     '''
     Gets usage counts for augmented chord slices
-    and the same weighted for 'length' (though NB issues with YCAC)
+    and the same weighted for 'length' (though NB issues with IOI length in YCAC)
     '''
 
     offs = []
@@ -144,7 +195,7 @@ def offsetPositions(file):
 
     return returnInfo
 
-def whatFollows(filePath,
+def whatFollows(file,
                 targetChord = '[0, 4, 8]',
                 histogram=True,
                 howMany=15,
@@ -154,7 +205,7 @@ def whatFollows(filePath,
     Optionally, return a histogram for the most common.
     '''
 
-    f = open(filePath)
+    f = open(file)
     next(f)
 
     pcs = []
@@ -195,3 +246,5 @@ def whatFollows(filePath,
         plt.savefig('Next.png', facecolor='w', edgecolor='w', format='png')
         return count
         return plt
+
+#------------------------------------------------------------------------------

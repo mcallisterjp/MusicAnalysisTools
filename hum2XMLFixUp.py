@@ -1,6 +1,14 @@
-from music21 import * # To do: Specify which
+from music21 import common
+from music21 import exceptions21
+from music21 import pitch
+from music21 import interval
+from music21 import stream
+from music21 import converter
+
+import numpy as np
 import os
-import csv
+
+#-------------------------------------------------------------------------------
 
 def oneKrnToXml(fileSourcePath, fileName):
     '''
