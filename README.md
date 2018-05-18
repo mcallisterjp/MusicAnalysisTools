@@ -1,2 +1,4 @@
 # MusicAnalysisTools
-music21 based tools for analysis. Often WIP and / or too niche for the main music21 repo
+Tools for musical analysis.
+Often music21-based (but too niche for the main repo) and / or WIP.
+Comments and suggestions welcome.
