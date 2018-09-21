@@ -1,11 +1,14 @@
 import unittest
 
 from music21 import common
-from music21 import exceptions21
-from music21 import pitch
-from music21 import interval
-from music21 import stream
 from music21 import converter
+from music21 import exceptions21
+from music21 import interval
+from music21 import key
+from music21 import meter
+from music21 import pitch
+from music21 import roman
+from music21 import stream
 
 from collections import Counter
 from numpy import array
@@ -14,7 +17,7 @@ import os
 
 #------------------------------------------------------------------------------
 
-# music21 > Tabular
+# music21 > Tabular (thus covers also RN > m21 > tabular)
 
 def M21toTSV(inputHarmonicAnalysis,
              outFilePath,
@@ -82,7 +85,7 @@ def M21toTSV(inputHarmonicAnalysis,
 
 #------------------------------------------------------------------------------
 
-# Tabular > music21
+# Tabular > music21 (thus covers also tabular > m21 > RN)
 
 def TSVtoM21(file):
     '''
@@ -135,6 +138,9 @@ def makeM21stream(prepdStream, harmonicArray):
     Takes chords from an array and inserts them into a music21 stream.
     '''
 
+    s = prepdStream
+    p = s.parts[0]
+
     measureList = [] # Keep a list of which are in
 
     for row in harmonicArray:
@@ -146,7 +152,7 @@ def makeM21stream(prepdStream, harmonicArray):
         measureOffset = float(row[4]) # ABC's 'totbeat'; music21's 'offset'
         qLength = float(row[9]) # ABC's 'length'; music21's 'quarterLength
         global_key = str(row[10])
-        local_key = str(row[11])
+        local_key = getLocalKey(str(row[11]), global_key)
         numeral = str(row[13])
 
         # Check if measure is in; if not, insert.
@@ -158,12 +164,24 @@ def makeM21stream(prepdStream, harmonicArray):
 
         # Insert the rn to the measure (which is now definitely in)
         if str(row[13]): # If there actually is a rn given ...
-            rn = roman.RomanNumeral(numeral, global_key) # e.g. roman.RomanNumeral('VI', 'F')
-            # *** TODO *** global_key > local_key
+            rn = roman.RomanNumeral(numeral, local_key) # e.g. roman.RomanNumeral('VI', 'F')
             rn.quarterLength = qLength
-            p.measure(thisMeasure).insert(metricalPosition - 1, rn) # rn at the relevant offset in bar (NB off by 1 error)
+            p.measure(thisMeasure).insert(metricalPosition - 1, rn)
+                                    # rn at the relevant offset in bar
+                                    # (NB off by 1 error between metricalPosition and offset)
 
     return s
+
+def getLocalKey(local_key, global_key):
+
+    asRoman = roman.RomanNumeral(local_key, global_key)
+    rt = asRoman.root().name
+    if asRoman.isMajorTriad():
+        newKey = rt.upper()
+    elif asRoman.isMinorTriad():
+        newKey = rt.lower()
+
+    return newKey
 
 #------------------------------------------------------------------------------
 
@@ -184,4 +202,4 @@ class Test(unittest.TestCase):
 
 
     # def testTSVtoM21(self):
-    # Location of TSV file -- musc21 virtual corpus?
+    # Location of TSV file -- music21 virtual corpus?
