@@ -146,7 +146,7 @@ def makeM21stream(prepdStream, harmonicArray):
     for row in harmonicArray:
 
         # Get the info
-        thisChord = row[0]
+        thisChord = str(row[0])
         thisMeasure = int(row[2])
         metricalPosition = float(row[3]) # ABC's 'beat'
         measureOffset = float(row[4]) # ABC's 'totbeat'; music21's 'offset'
@@ -163,8 +163,14 @@ def makeM21stream(prepdStream, harmonicArray):
             measureList.append(thisMeasure)
 
         # Insert the rn to the measure (which is now definitely in)
-        if str(row[13]): # If there actually is a rn given ...
+        if numeral:# Or else if thisChord is not '@none'. If there actually is a rn given ...
+            if '/' in thisChord:
+                tonicised = getReallyLocalKey(thisChord, local_key)
+                local_key = tonicised[0]
+                # numeral = tonicised[1]
             rn = roman.RomanNumeral(numeral, local_key) # e.g. roman.RomanNumeral('VI', 'F')
+            # TODO use row[0] instead of row[13] for inversions etc.
+            # First strip out '.' and '\\\\' and check that the additions '(+6)' parse.
             rn.quarterLength = qLength
             p.measure(thisMeasure).insert(metricalPosition - 1, rn)
                                     # rn at the relevant offset in bar
@@ -173,6 +179,9 @@ def makeM21stream(prepdStream, harmonicArray):
     return s
 
 def getLocalKey(local_key, global_key):
+    '''
+    Re-casts comparative local key (e.g. V of G major) in its own terms (D major).
+    '''
 
     asRoman = roman.RomanNumeral(local_key, global_key)
     rt = asRoman.root().name
@@ -182,6 +191,24 @@ def getLocalKey(local_key, global_key):
         newKey = rt.lower()
 
     return newKey
+
+def getReallyLocalKey(rn, local_key):
+    '''
+    Separates comparative roman numeral for tonicisiations like 'V/IV' into the component parts of
+    - a roman numeral (V) and
+    - a (very) local key (IV)
+    and expresses that very local key in relation to the local key in column 11.
+    '''
+
+    if '/' not in rn:
+        raise ValueError("Only call this function to seperate a comparative romam numeral like 'V/V'")
+    else:
+        position = rn.index('/')
+        # romanPart = text[:position] # TODO see above
+        very_local_as_roman = rn[position+1:]
+        very_local_as_key = getLocalKey(very_local_as_roman, local_key)
+
+    return very_local_as_key # , romanPart
 
 #------------------------------------------------------------------------------
 
@@ -198,6 +225,7 @@ class Test(unittest.TestCase):
         from io import IOBase
 
         openFile = open('/Users/Mark/Desktop/MonTSV.tsv', 'w')
+
         self.assertIsInstance(openFile, IOBase)
 
 
