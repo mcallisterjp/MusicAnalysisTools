@@ -5,6 +5,7 @@ from music21 import converter
 from music21 import exceptions21
 from music21 import interval
 from music21 import key
+from music21 import metadata
 from music21 import meter
 from music21 import pitch
 from music21 import roman
@@ -98,7 +99,7 @@ class TSVtoM21:
         harmonicArray = TSVtoM21.prepFile(file)
         prepdStream = TSVtoM21.prepStream(harmonicArray=harmonicArray)
         m21stream = TSVtoM21.makeM21stream(prepdStream=prepdStream,
-                                  harmonicArray=harmonicArray)
+                                            harmonicArray=harmonicArray)
 
         return m21stream
 
@@ -120,14 +121,49 @@ class TSVtoM21:
 
     def prepStream(harmonicArray):
         '''
-        Prepares a m21 stream for the harmonic analysis to go into.
+        Prepares a music21 stream for the harmonic analysis to go into.
+        Specifically, creates the score, part, and measure streams
+        as well as some (the available) metadata.
         '''
 
         s = stream.Score()
         p = stream.Part()
 
-        p.insert(0, key.Key(harmonicArray[0][10])) # starting key sig
-        p.insert(0, meter.TimeSignature(harmonicArray[0][5])) # starting time sig
+        # Transfer metadatafrom within array. TODO check no changes later (two movts in one doc).
+        s.insert(0, metadata.Metadata())
+        s.metadata.opusNumber = int(harmonicArray[0][6])
+        s.metadata.number = int(harmonicArray[0][7])
+        s.metadata.movementNumber = int(harmonicArray[0][8])
+
+        startingKeySig = str(harmonicArray[0][10])
+        ks = key.Key(startingKeySig)
+        p.insert(0, ks)
+
+        startingTimeSig = str(harmonicArray[0][5])
+        ts = meter.TimeSignature(startingTimeSig)
+        p.insert(0, ts) # TODO check for changes later see (below).
+
+        numerator = ts.numerator
+
+        measures = list([int(row[2]) for row in harmonicArray])
+        firstMeasure = measures[0]
+        #
+        last = measures[-1]
+        print(last)
+        #
+        difference = 0 # initialise. 0 where no anacrusis (piece starts at the beginning of m1).
+        if firstMeasure == 0:
+            measure1index = measures.index(1)
+            difference += (harmonicArray[measure1index][4] - harmonicArray[0][4]) # totbeat
+
+        # Insert all measures into stream.
+        for eachMeasureNo in range(measures[0], measures[-1]+1): # From start (0 or 1) to end.
+            print(eachMeasureNo)
+            m = stream.Measure(number=eachMeasureNo)
+            m.offset = (eachMeasureNo-1)*numerator + difference
+            # TODO checks for timesig changes
+            # TODO generalise for all timesig types (compound)
+            p.insert(m)
 
         s.append(p)
 
@@ -141,25 +177,6 @@ class TSVtoM21:
         s = prepdStream
         p = s.parts[0]
 
-        timesig = str(harmonicArray[0][5])
-        ts = meter.TimeSignature(timesig)
-        numerator = ts.numerator
-
-        measures = list([int(row[2]) for row in harmonicArray])
-        firstMeasure = measures[0]
-        difference = 0 # initialise. 0 where no anacrusis (piece starts at the beginning of m1).
-        if firstMeasure == 0:
-            measure1index = measures.index(1)
-            difference += (harmonicArray[measure1index][4] - harmonicArray[0][4]) # totbeat
-
-        # Insert all measures into stream
-        for eachMeasureNo in range(measures[0], measures[-1]): # Might start with 0 or 1
-            m = stream.Measure(number=eachMeasureNo)
-            m.offset = (eachMeasureNo-1)*numerator + difference
-            # TODO checks for timesig changes
-            # TODO generaise for all timesig types (compound)
-            p.insert(m)
-
         for row in harmonicArray:
 
             # Get info.
@@ -170,19 +187,17 @@ class TSVtoM21:
             offsetInMeasure = beat - 1
             totbeat = float(row[4]) # music21's 'offset' but again, + 1 (starts on 1)
             # timesig = # Needed to check changes TODO
-            # op = # Dealt with in metadata, must not change. TODO
-            # no = # Dealt with in metadata, must not change. TODO
-            # mov = # Dealt with in metadata, must not change. TODO
+            # op, no, mov = 4, 5, 6 # Dealt with in metadata.
             length = float(row[9]) # music21's 'quarterLength'
             global_key = str(row[10])
-            local_key = TSVtoM21.getLocalKey(str(row[11]), global_key) #***
+            local_key = TSVtoM21.getLocalKey(str(row[11]), global_key)
             # pedal =
             numeral = str(row[13])
             form = str(row[14])
             figbass = str(row[15])
             changes = str(row[16])
             relativeRoot = str(row[17])
-            # phraseend
+            # phraseend = #
 
             # Insert the rn to the relevant measure
             if numeral: # If there is a rn. Covers empty strings. Ossia if thisChord is not '@none'.
@@ -193,7 +208,7 @@ class TSVtoM21:
                 rn.quarterLength = length
                 try:
                     p.measure(thisMeasure).insert(offsetInMeasure, rn)
-                except: # TODO fix this bug
+                except:
                     raise ValueError('No such measure number %s in this piece' %thisMeasure)
 
         return s
