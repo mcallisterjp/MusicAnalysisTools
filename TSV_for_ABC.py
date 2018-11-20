@@ -14,6 +14,39 @@ from copy import deepcopy
 import csv
 
 #------------------------------------------------------------------------------
+class Chord(object):
+    __attrs__= ('chord',
+                'altchord',
+                'measure',
+                'beat',
+                'totbeat',
+                'timesig',
+                'op',
+                'no',
+                'mov',
+                'length',
+                'global_key',
+                'local_key',
+                'pedal',
+                'numeral',
+                'form',
+                'figbass',
+                'changes',
+                'relativeroot',
+                'phraseend',)
+
+    def attrs(self):
+        "Return attrs in a dict"
+        return [(field_name, getattr(self, field_name))
+                for field_name in self.__attrs__]
+
+    def __iter__(self):
+        for field_name in self.__attrs__:
+            yield getattr(self, field_name)
+
+    def __getitem__(self, index):
+        "getitem by tuple-style index"
+        return getattr(sel, self.__slots__[index])
 
 class M21: # M21 > TSV
     '''
@@ -25,31 +58,8 @@ class M21: # M21 > TSV
 
     def toM21Array(self):
         '''
-        Convertion from a music21 harmonic analysis to an intermediary array format.
+        Conversion from a music21 harmonic analysis to an intermediary array format.
         '''
-
-        headers = ['chord', # 0
-                    'altchord',
-                    'measure',
-                    'beat',
-                    'totbeat',
-                    'timesig', # 5
-                    'op',
-                    'no',
-                    'mov',
-                    'length',
-                    'global_key', # 10
-                    'local_key',
-                    'pedal',
-                    'numeral',
-                    'form',
-                    'figbass', # 15
-                    'changes',
-                    'relativeroot',
-                    'phraseend']
-
-        info = [headers]
-
         inputHarmonicAnalysis = self.m21HarmonicAnalysis
 
         # MD
@@ -57,6 +67,7 @@ class M21: # M21 > TSV
         no = inputHarmonicAnalysis.metadata.number
         mvmt = inputHarmonicAnalysis.metadata.movementNumber
 
+        info = []
         romans = []
 
         for item in inputHarmonicAnalysis.recurse():
@@ -69,42 +80,32 @@ class M21: # M21 > TSV
 
         for item in romans: # Intermediary list because global needed in advance.
 
+            thisEntry = Chord()
             # Relative root (NB duplicates vLocalKey method). TODO***
-            relativeroot = None
-            fig = item.figure
-            if '/' in fig:
-                position = fig.index('/')
+            thisEntry.relativeroot = None
+            thisEntry.chord = item.figure
+            if '/' in thisEntry.chord:
+                position = thisEntry.chord.index('/')
                 try:
-                    int(fig[position+1]) # If it's an int then format of e.g. I6/4 rather than V/ii
+                    int(thisEntry.chord[position+1]) # If it's an int then format of e.g. I6/4 rather than V/ii
                 except:
-                    relativeroot = fig[position+1:]
+                    relativeroot = thisEntry.chord[position+1:]
+
+            thisEntry.measure = item.measureNumber
+            thisEntry.beat = item.offset
+            thisEntry.timesig = ts #TODO***
+            thisEntry.op = opn
+            thisEntry.no = no
+            thisEntry.mov = mvmt
+            thisEntry.length = item.quarterLength
+            thisEntry.global_key = globalKey
 
             # Local key. An ugly solution to be sure. TODO***
             pitches = item.key.pitches
             thisChord = chord.Chord([pitches[0], pitches[2], pitches[4]])
             rn = roman.romanNumeralFromChord(thisChord, key.Key(globalKey))
-            localKey = rn.figure
+            thisEntry.local_key = rn.figure
 
-            thisEntry = [item.figure, # TODO: combine key for key changes.
-                        None, #'altchord',
-                        item.measureNumber,
-                        item.offset, # beat
-                        None, # 'totbeat',
-                        ts, # 'timesig', # 5 #TODO***
-                        opn,# 'op',
-                        no,# 'no',
-                        mvmt,# 'mov',
-                        item.quarterLength, # 'length',
-                        globalKey, # 'global_key', # 10. Set below
-                        localKey, # local_key
-                        None, # 'pedal',
-                        item.figure, # 'numeral',
-                        None, # 'form',
-                        None, # 'figbass', # 15
-                        None, # 'changes',
-                        relativeroot, # 'relativeroot',
-                        None, # 'phraseend'
-                        ]     # TODO: Review these and fill remaining columns using.
             info.append(thisEntry)
 
         harmonicArray = array(info)
@@ -119,32 +120,29 @@ class M21: # M21 > TSV
 
         ABC_Array = deepcopy(self.M21Array)
 
-        globalKey = ABC_Array[1][10]
+        globalKey = ABC_Array[0].global_key
 
-        for row in ABC_Array[1:]: # Leave header.
-            if globalKey == globalKey.lower(): # If the global key is minor ...
-                row[11] = characterSwaps(row[11], minor=True, direction='m21-ABC')
-            else:
-                row[11] = characterSwaps(row[11], minor=False, direction='m21-ABC')
+        for row in ABC_Array:
+            row.local_key = characterSwaps(row.local_key, minor=is_minor(globalKey), direction='m21-ABC')
 
-            if row[11] == row[11].lower(): # If the local key is minor ...
-                if row[17]: # If there's a relative root
-                    if row[17] == row[17].lower(): # ... and it's minor too change it and the figure
-                        row[17] = characterSwaps(row[17], minor=True, direction='m21-ABC')
-                        row[13] = characterSwaps(row[13], minor=True, direction='m21-ABC')
+            if is_minor(row.local_key):
+                if row.relativeroot: # If there's a relative root
+                    if is_minor(row.relativeroot): # ... and it's minor too change it and the figure
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=True, direction='m21-ABC')
+                        row.numeral = characterSwaps(row.numeral, minor=True, direction='m21-ABC')
                     else: # ... rel. root but not minor
-                        row[17] = characterSwaps(row[17], minor=False, direction='m21-ABC')
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=False, direction='m21-ABC')
                 else: # No relative root
-                    row[13] = characterSwaps(row[13], minor=True, direction='m21-ABC')
+                    row.numeral = characterSwaps(row.numeral, minor=True, direction='m21-ABC')
             else: # local Key not minor
-                if row[17]: # If there's a relative root
-                    if row[17] == row[17].lower(): # ... and it's minor
-                        row[17] = characterSwaps(row[17], minor=False, direction='m21-ABC')
-                        row[13] = characterSwaps(row[13], minor=True, direction='m21-ABC')
+                if row.relativeroot: # If there's a relative root
+                    if is_minor(row.relativeroot): # ... and it's minor
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=False, direction='m21-ABC')
+                        row.numeral = characterSwaps(row.numeral, minor=True, direction='m21-ABC')
                     else: # ... rel. root but not minor
-                        row[17] = characterSwaps(row[17], minor=False, direction='m21-ABC')
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=False, direction='m21-ABC')
                 else: # No relative root
-                    row[13] = characterSwaps(row[13], minor=False, direction='m21-ABC')
+                    row.numeral = characterSwaps(row.numeral, minor=False, direction='m21-ABC')
 
         self.ABC_Array = ABC_Array
 
@@ -161,6 +159,10 @@ class M21: # M21 > TSV
             harmonicInfo = self.M21Array
 
         tsvOut = arrayToTSV(harmonicInfo, outFilePath=outFilePath, outFileName=outFileName)
+
+    @staticmethod
+    def is_minor(key):
+        return key == key.lower()
 
 #------------------------------------------------------------------------------
 
@@ -200,50 +202,47 @@ class TSV:
 
         M21Array = deepcopy(self.ABC_Array)
 
-        globalKey = M21Array[1][10]
+        globalKey = M21Array[0].global_key
 
-        for row in M21Array[1:]: # Ignore headers here
+        for row in M21Array:
 
             # As above, but direction='ABC-m21'. TODO Make into a separate, static function
 
             # Global - local
-            if globalKey == globalKey.lower():
-                row[11] = characterSwaps(row[11], minor=True, direction='ABC-m21')
-            else:
-                row[11] = characterSwaps(row[11], minor=False, direction='ABC-m21')
+            row.local_key = characterSwaps(row.local_key, minor=is_minor(globalKey), direction='ABC-m21')
 
             # Local - rel and figure
-            if row[11] == row[11].lower():
-                if row[17]:
-                    if row[17] == row[17].lower():
-                        row[17] = characterSwaps(row[17], minor=True, direction='ABC-m21')
-                        row[13] = characterSwaps(row[13], minor=True, direction='ABC-m21')
+            if is_minor(row.local_key):
+                if row.relativeroot:
+                    if is_minor(row.relativeroot):
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=True, direction='ABC-m21')
+                        row.numeral = characterSwaps(row.numeral, minor=True, direction='ABC-m21')
                     else:
-                        row[17] = characterSwaps(row[17], minor=False, direction='ABC-m21')
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=False, direction='ABC-m21')
                 else:
-                    row[13] = characterSwaps(row[13], minor=True, direction='ABC-m21')
+                    row.numeral = characterSwaps(row.numeral, minor=True, direction='ABC-m21')
             else: # local key not minor
-                if row[17]:
-                    if row[17] == row[17].lower(): # ... and it's minor
-                        row[17] = characterSwaps(row[17], minor=False, direction='ABC-m21')
-                        row[13] = characterSwaps(row[13], minor=True, direction='ABC-m21')
+                if row.relativeroot:
+                    if is_minor(row.relativeroot): # ... and it's minor
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=False, direction='ABC-m21')
+                        row.numeral = characterSwaps(row.numeral, minor=True, direction='ABC-m21')
                     else: # ... rel. root but not minor
-                        row[17] = characterSwaps(row[17], minor=False, direction='ABC-m21')
+                        row.relativeroot = characterSwaps(row.relativeroot, minor=False, direction='ABC-m21')
                 else: # No relative root
-                    row[13] = characterSwaps(row[13], minor=False, direction='ABC-m21')
+                    row.numeral = characterSwaps(row.numeral, minor=False, direction='ABC-m21')
 
 
-            numeral = str(row[13])
-            form = str(row[14])
-            figbass = str(row[15])
-            # changes = str(row[16]). TODO***
-            relativeRoot = str(row[17])
+            numeral = str(row.numeral)
+            form = str(row.form)
+            figbass = str(row.figbass)
+            # changes = str(row.changes). TODO***
+            relativeRoot = str(row.relativeroot)
 
             # Combined figure for column[0] (though NB no key in the m21 case).
             combined = ''.join([numeral, form, figbass]) # , changes]). conversion TODO***
             if relativeRoot: # special case requiring '/'.
                 combined = ''.join([combined, '/', relativeRoot])
-            row[0] = combined
+            row.chord = combined
 
         self.M21Array = M21Array
 
@@ -258,20 +257,20 @@ class TSV:
         reducedData = [headers]
 
         harmonicArray = self.M21Array
-        for row in harmonicArray[1:]:
+        for row in harmonicArray:
 
-            thisMeasure = int(row[2])
-            beat =  float(row[3])
-            totbeat = float(row[4])
+            thisMeasure = int(row.measure)
+            beat =  float(row.beat)
+            totbeat = float(row.totbeat)
 
-            global_key = row[10]
-            local_key = row[11]
+            global_key = row.global_key
+            local_key = row.local_key
 
             local_key_V2 = getLocalKey(local_key, global_key)
             local_key_V3 = key.Key(local_key_V2)
 
             try: # Some RNs missing
-                rn = roman.RomanNumeral(row[0], local_key_V3) # e.g. ('VI', 'd')
+                rn = roman.RomanNumeral(row.chord, local_key_V3) # e.g. ('VI', 'd')
                 pitches = [x.pitchClass for x in rn.pitches]
                 newRow = [thisMeasure, beat, totbeat, pitches]
                 reducedData.append(newRow)
@@ -292,7 +291,7 @@ class TSV:
 
         harmonicArray = self.M21Array
 
-        for row in harmonicArray[1:]: # Ignore headers again ...
+        for row in harmonicArray:
 
             # Get info.
             firstColumn = str(row[0])
@@ -305,13 +304,13 @@ class TSV:
             # op, no, mov = 4, 5, 6 # Dealt with in metadata.
             length = float(row[9]) # music21's 'quarterLength'
             global_key = str(row[10])
-            local_key = getLocalKey(str(row[11]), global_key)
+            local_key = getLocalKey(str(row.local_key), global_key)
             # pedal =
-            numeral = str(row[13])
+            numeral = str(row.numeral)
             form = str(row[14])
             figbass = str(row[15])
             changes = str(row[16])
-            relativeRoot = str(row[17])
+            relativeRoot = str(row.relativeroot)
             # phraseend = #
 
             # Insert the rn to the relevant measure
@@ -345,22 +344,22 @@ class TSV:
 
         # Transfer metadatafrom within array. Check no in-doc changes (one doc, two mvmts). TODO***
         s.insert(0, metadata.Metadata())
-        s.metadata.opusNumber = harmonicArray[1][6]
-        s.metadata.number = harmonicArray[1][7]
-        s.metadata.movementNumber = harmonicArray[1][8]
+        s.metadata.opusNumber = harmonicArray[0].op
+        s.metadata.number = harmonicArray[0].no
+        s.metadata.movementNumber = harmonicArray[0].mov
         # Would use int() except they sometimes include text like 'op2', 'no1'.
 
-        startingKeySig = str(harmonicArray[1][10])
+        startingKeySig = str(harmonicArray[0].global_key)
         ks = key.Key(startingKeySig)
         p.insert(0, ks)
 
-        startingTimeSig = str(harmonicArray[1][5])
+        startingTimeSig = str(harmonicArray[0].ts)
         ts = meter.TimeSignature(startingTimeSig)
         p.insert(0, ts) # Check for ts changes later. TODO***
 
         numerator = ts.numerator
 
-        measures = list([int(row[2]) for row in harmonicArray[1:]]) # Headers again ...
+        measures = list([int(row.measure) for row in harmonicArray])
         firstMeasure = measures[0]
         #
         last = measures[-1]
@@ -368,7 +367,7 @@ class TSV:
         difference = 0 # initialise. 0 where no anacrusis (piece starts at the beginning of m1).
         if firstMeasure == 0:
             measure1index = measures.index(1)
-            difference += (harmonicArray[measure1index][4] - harmonicArray[0][4]) # totbeat
+            difference += (harmonicArray[measure1index].totbeat - harmonicArray[0].totbeat)
 
         # Insert all measures into stream.
         for eachMeasureNo in range(measures[0], measures[-1]+1): # From start (0 or 1) to end.
@@ -383,6 +382,10 @@ class TSV:
         self.prepdStream = s
 
         return s
+
+    @staticmethod
+    def is_minor(key):
+        return key == key.lower()
 
 #------------------------------------------------------------------------------
 
@@ -476,10 +479,7 @@ def getLocalKey(local_key, global_key, convert=False):
     '''
 
     if convert==True:
-        if global_key[0] == global_key[0].lower(): # Minor. Given by first character (e.g. D, d, F#, f#, Bb, bb)
-            local_key = characterSwaps(local_key, minor=True, direction='ABC-m21')
-        else:
-            local_key = characterSwaps(local_key, minor=False, direction='ABC-m21')
+        local_key = characterSwaps(local_key, minor=is_minor(global_key[0]), direction='ABC-m21')
 
     asRoman = roman.RomanNumeral(local_key, global_key)
     rt = asRoman.root().name
@@ -535,7 +535,7 @@ def finalOccurence(haystack, needle):
     '''
 
     flippedHaystack = haystack[::-1]
-    negIndex = flippedHaystack.find(needle)
+    negIndex = flippedHaystack.find(needle[::-1])
     realIndex = len(haystack) - (negIndex + 1)
 
     return realIndex
@@ -552,11 +552,11 @@ class Test(unittest.TestCase):
         m21Monteverdi = initial.toM21Array()
         TSVMonteverdi = initial.toTSVArray()
 
-        self.assertEqual(m21Monteverdi[5][0], 'I')
-        self.assertEqual(TSVMonteverdi[5][0], 'I')
+        self.assertEqual(m21Monteverdi[4].chord, 'I')
+        self.assertEqual(TSVMonteverdi[4].chord, 'I')
 
-        self.assertEqual(m21Monteverdi[175][13], 'viio6')
-        self.assertEqual(TSVMonteverdi[175][13], '#viio6')
+        self.assertEqual(m21Monteverdi[174].numeral, 'viio6')
+        self.assertEqual(TSVMonteverdi[174].numeral, '#viio6')
 
     # def testTSVtoM21(self): # TODO
 
